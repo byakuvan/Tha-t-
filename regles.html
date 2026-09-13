@@ -1,0 +1,618 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}
+  img{max-width:100%}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<title>Règles de Thaïté</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,600&family=Libre+Franklin:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap">
+<style>
+  :root{
+    --bg:#f3ecd8; --surface:#fffdf6; --surface-2:#ece0c1; --ink:#241c10; --ink-soft:#6d5f45;
+    --line:#ddccA0; --accent:#0e6b4a; --accent-ink:#fffdf6; --accent-soft:#dcefe1;
+    --gold:#a1752a; --felt:#0f3d2c; --felt-2:#12523a;
+    --shadow:0 8px 22px -12px rgba(36,28,16,.4);
+    --radius:14px; --radius-sm:9px;
+    /* Cartes, mains et pulls : couleurs fixes, comme un vrai jeu de cartes — elles ne changent pas
+       selon l'éclairage de la pièce (le thème clair/sombre du site). */
+    --card-face:#fdfdfb; --card-red:#c8102e; --card-black:#1b1b1b; --card-gold:#b8912f;
+    --skin:#e3b98c; --skin-line:rgba(30,20,10,.28); --danger:#a83c34;
+    --sleeve-1:#a3352b; --sleeve-2:#2f6690; --sleeve-3:#4c8a4f; --sleeve-4:#cf9c1f;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0a2a20; --surface:#123a2c; --surface-2:#164634; --ink:#f4ecd9; --ink-soft:#c3d3c7;
+      --line:#1f5643; --accent:#e0b452; --accent-ink:#1a1305; --accent-soft:#1c3b2c;
+      --gold:#e6c15c; --felt:#082018; --felt-2:#0d3226; --danger:#e6867c;
+      --shadow:0 10px 26px -12px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0a2a20; --surface:#123a2c; --surface-2:#164634; --ink:#f4ecd9; --ink-soft:#c3d3c7;
+    --line:#1f5643; --accent:#e0b452; --accent-ink:#1a1305; --accent-soft:#1c3b2c;
+    --gold:#e6c15c; --felt:#082018; --felt-2:#0d3226; --danger:#e6867c;
+    --shadow:0 10px 26px -12px rgba(0,0,0,.6);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:"Libre Franklin",system-ui,-apple-system,sans-serif;
+    padding:20px 14px 44px;
+  }
+  .mono{font-family:"Space Mono",ui-monospace,monospace; font-variant-numeric:tabular-nums;}
+  h1,h2,h3{font-family:"Fraunces",Georgia,serif; text-wrap:balance; margin:0;}
+
+  .page{max-width:620px; margin:0 auto; display:flex; flex-direction:column; gap:14px;}
+
+  /* ---------- en-tête ---------- */
+  .masthead{display:flex; flex-direction:column; align-items:center; text-align:center; gap:5px; padding:2px 0;}
+  .masthead h1{font-size:1.7rem;}
+  .masthead h1 em{font-style:normal; color:var(--gold);}
+  .masthead .suits{font-family:"Space Mono",monospace; letter-spacing:.16em; font-size:.68rem; color:var(--ink-soft);}
+  .masthead .subtitle{color:var(--ink-soft); font-size:.8rem; max-width:46ch; text-wrap:balance;}
+
+  /* ---------- carte de règle ---------- */
+  .rule-card{
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+    box-shadow:var(--shadow); padding:16px clamp(12px,3.5vw,20px); display:flex; flex-direction:column; gap:12px;
+  }
+  .rule-eyebrow{
+    font-family:"Space Mono",monospace; font-size:.62rem; font-weight:700; letter-spacing:.13em;
+    text-transform:uppercase; color:var(--gold);
+  }
+  .rule-text{font-size:.98rem; font-weight:500; line-height:1.4; text-wrap:balance;}
+  .rule-text strong{font-weight:700; color:var(--gold);}
+
+  .illustration{
+    background:linear-gradient(160deg,var(--felt),var(--felt-2));
+    border-radius:var(--radius-sm); padding:12px clamp(8px,2.5vw,16px);
+    display:flex; flex-direction:column; gap:8px; align-items:center;
+  }
+  .illus-row{display:flex; align-items:center; justify-content:center; gap:6px; flex-wrap:wrap;}
+  .illus-caption{
+    font-size:.7rem; color:#dfe9e2; opacity:.85; text-align:center; max-width:44ch; text-wrap:balance;
+  }
+
+  .lt-sign{
+    font-family:"Fraunces",Georgia,serif; font-style:italic; font-weight:600;
+    font-size:1.15rem; color:var(--gold); line-height:1; padding:0 1px;
+  }
+  .or-sign{
+    font-family:"Fraunces",Georgia,serif; font-style:italic; font-weight:600;
+    font-size:.8rem; color:var(--gold); line-height:1; padding:0 2px;
+  }
+
+  /* boîte blanche ("encadré blanc") réutilisée pour chaque élément illustré */
+  .frame{
+    background:var(--card-face); border:1px solid rgba(20,20,20,.14); border-radius:9px;
+    box-shadow:0 3px 10px rgba(0,0,0,.2); padding:8px 10px;
+    display:flex; flex-direction:column; align-items:center; gap:4px;
+  }
+
+  /* ---------- pastille de couleur (hiérarchie carreau/trèfle/coeur/pique) ---------- */
+  .suit-chip{display:flex; flex-direction:column; align-items:center; gap:2px; min-width:38px;}
+  .suit-chip .glyph{font-family:"Space Mono",monospace; font-size:1.35rem; line-height:1;}
+  .suit-chip .glyph.red{color:var(--card-red);}
+  .suit-chip .glyph.black{color:var(--card-black);}
+  .suit-chip .name{font-size:.52rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#5b5346;}
+
+  /* ---------- jeu en 5 cartes présenté seul dans son encadré ---------- */
+  .combo-frame{gap:6px; padding:10px 12px;}
+  .combo-frame .card-group{padding-left:8px;}
+  .combo-label{font-size:.52rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#5b5346;}
+
+  /* ---------- tableau de cartes cumulées / classement final ---------- */
+  .scoreboard{width:min(360px,100%); align-items:stretch; gap:10px; padding:12px 14px;}
+  .scoreboard-title{font-size:.62rem; font-weight:700; letter-spacing:.03em; color:#5b5346; text-align:left;}
+  .tally{display:grid; grid-template-columns:24px 62px 1fr 28px; row-gap:8px; column-gap:7px; align-items:center; width:100%;}
+  .rank-badge{font-family:"Space Mono",monospace; font-size:.6rem; font-weight:700; color:var(--gold); text-align:center;}
+  .rank-badge.lost{color:var(--danger);}
+  .tally-name{display:flex; align-items:center; gap:4px; font-family:"Space Mono",monospace; font-size:.5rem; font-weight:700; text-transform:uppercase; letter-spacing:.03em; color:#5b5346; white-space:nowrap;}
+  .tally-track{position:relative; height:11px; background:rgba(20,20,20,.09); border-radius:4px;}
+  .tally-fill{position:absolute; left:0; top:0; bottom:0; border-radius:4px;}
+  .tally-fill.sleeve-1{background:var(--sleeve-1);}
+  .tally-fill.sleeve-2{background:var(--sleeve-2);}
+  .tally-fill.sleeve-3{background:var(--sleeve-3);}
+  .tally-fill.sleeve-4{background:var(--sleeve-4);}
+  .tally-fill.over{background:var(--danger);}
+  .tally-limit{position:absolute; top:-3px; bottom:-3px; width:2px; background:var(--danger);}
+  .tally-value{font-family:"Space Mono",monospace; font-size:.6rem; font-weight:700; text-align:right; color:#3a332a;}
+  .scoreboard-legend{display:flex; align-items:center; gap:6px; font-size:.6rem; color:#5b5346;}
+  .scoreboard-legend .swatch{width:2px; height:11px; background:var(--danger); flex:none;}
+
+  /* ---------- mise en scène d'un joueur (pull + main + carte posée) ---------- */
+  .player-scene{display:flex; flex-direction:column; align-items:center; gap:4px;}
+  .name-tag{
+    display:flex; align-items:center; gap:4px; font-family:"Space Mono",monospace;
+    font-size:.5rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#5b5346;
+  }
+  .name-tag .dot{width:6px; height:6px; border-radius:50%; box-shadow:inset 0 0 0 1px rgba(0,0,0,.25);}
+  .dot.sleeve-1{background:var(--sleeve-1);}
+  .dot.sleeve-2{background:var(--sleeve-2);}
+  .dot.sleeve-3{background:var(--sleeve-3);}
+  .dot.sleeve-4{background:var(--sleeve-4);}
+
+  /* la (les) carte(s) posée(s) reposent sur les doigts : léger chevauchement négatif */
+  .hand-play{position:relative; display:flex; flex-direction:column; align-items:center;}
+  .hand-play .card-slot{position:relative; z-index:2;}
+  .card-group{display:flex; position:relative; z-index:2;}
+  .card-group .card-slot:not(:first-child){margin-left:-14px;}
+  .row-label{
+    font-family:"Space Mono",monospace; font-size:.58rem; font-weight:700; letter-spacing:.1em;
+    text-transform:uppercase; color:#cddccf; opacity:.8; align-self:flex-start; margin:0 0 -2px 2px;
+  }
+  .hand-icon{width:46px; height:auto; display:block; margin-top:-5px; z-index:1;}
+  .hand-icon .skin{fill:var(--skin); stroke:var(--skin-line); stroke-width:1.5;}
+  .hand-icon .cuff{stroke:rgba(0,0,0,.22); stroke-width:1;}
+  .hand-icon .cuff.sleeve-1{fill:var(--sleeve-1);}
+  .hand-icon .cuff.sleeve-2{fill:var(--sleeve-2);}
+  .hand-icon .cuff.sleeve-3{fill:var(--sleeve-3);}
+  .hand-icon .cuff.sleeve-4{fill:var(--sleeve-4);}
+
+  /* ---------- rendu des cartes (identique au jeu, en petit format) ---------- */
+  .card{
+    position:relative; width:34px; height:48px; border-radius:5px; background:var(--card-face);
+    border:1px solid rgba(20,20,20,.16); box-shadow:0 2px 5px rgba(0,0,0,.26);
+    font-family:"Space Mono",monospace; font-weight:700; user-select:none; overflow:hidden;
+  }
+  .card .corner{position:absolute; display:flex; flex-direction:column; align-items:center; line-height:1;}
+  .card .corner.tl{top:1px; left:2px;}
+  .card .corner.br{bottom:1px; right:2px; transform:rotate(180deg);}
+  .card .corner .rank{font-size:.42rem;}
+  .card .corner .suit{font-size:.34rem;}
+  .card .card-center{position:absolute; inset:13px 2px; display:flex; align-items:center; justify-content:center;}
+  .card .card-center:has(.face-court){inset:5px 3px;}
+  .card .pip{position:absolute; font-size:.33rem; line-height:1;}
+  .card .pip-ace{position:static; font-size:.95rem;}
+  .card.red{color:var(--card-red);}
+  .card.black{color:var(--card-black);}
+
+  .footer-note{text-align:center; color:var(--ink-soft); font-size:.72rem; padding:2px 0 0;}
+</style>
+
+<div class="page">
+  <header class="masthead">
+    <h1>Th<em>aïté</em></h1>
+    <div class="suits">♦ ♣ ♥ ♠</div>
+    <p class="subtitle">Les règles du jeu, ligne par ligne — chaque règle illustrée par un tour de jeu.</p>
+  </header>
+
+  <div class="rules">
+
+    <article class="rule-card">
+      <div class="rule-eyebrow">Règle</div>
+      <p class="rule-text">Les couleurs ont leur importance : elles n'ont pas toutes la même valeur.</p>
+
+      <div class="illustration">
+        <div class="illus-row">
+          <div class="frame"><div class="suit-chip"><span class="glyph red">♦</span><span class="name">Carreau</span></div></div>
+          <span class="lt-sign">&lt;</span>
+          <div class="frame"><div class="suit-chip"><span class="glyph black">♣</span><span class="name">Trèfle</span></div></div>
+          <span class="lt-sign">&lt;</span>
+          <div class="frame"><div class="suit-chip"><span class="glyph red">♥</span><span class="name">Cœur</span></div></div>
+          <span class="lt-sign">&lt;</span>
+          <div class="frame"><div class="suit-chip"><span class="glyph black">♠</span><span class="name">Pique</span></div></div>
+        </div>
+        <p class="illus-caption">Du plus faible au plus fort.</p>
+
+        <span class="row-label">La carte la plus forte</span>
+        <div class="illus-row">
+          <div class="frame combo-frame"><div class="card-group"><div class="card-slot" data-card="AD"></div></div></div>
+          <span class="lt-sign">&lt;</span>
+          <div class="frame combo-frame"><div class="card-group"><div class="card-slot" data-card="2D"></div></div></div>
+        </div>
+        <p class="illus-caption">Le 2 est la carte la plus forte du jeu : il bat même l'As.</p>
+
+        <span class="row-label">Exception des suites</span>
+        <div class="illus-row">
+          <div class="frame combo-frame">
+            <div class="card-group"><div class="card-slot" data-card="2D"></div><div class="card-slot" data-card="3C"></div><div class="card-slot" data-card="4H"></div><div class="card-slot" data-card="5S"></div><div class="card-slot" data-card="6D"></div></div>
+            <span class="combo-label">La plus faible</span>
+          </div>
+          <span class="lt-sign">&lt;</span>
+          <div class="frame combo-frame">
+            <div class="card-group"><div class="card-slot" data-card="10D"></div><div class="card-slot" data-card="JC"></div><div class="card-slot" data-card="QH"></div><div class="card-slot" data-card="KS"></div><div class="card-slot" data-card="AD"></div></div>
+            <span class="combo-label">Suite royale</span>
+          </div>
+          <span class="lt-sign">&lt;</span>
+          <div class="frame combo-frame">
+            <div class="card-group"><div class="card-slot" data-card="AD"></div><div class="card-slot" data-card="2C"></div><div class="card-slot" data-card="3H"></div><div class="card-slot" data-card="4S"></div><div class="card-slot" data-card="5D"></div></div>
+            <span class="combo-label">As-2-3-4-5</span>
+          </div>
+        </div>
+        <p class="illus-caption">À une exception près : 2-3-4-5-6 est la suite la plus faible, tandis que As-2-3-4-5 est la plus forte de toutes — elle bat même la suite royale (10-J-Q-K-As). La même exception s'applique aux quintes flush.</p>
+      </div>
+
+      <div class="illustration">
+        <div class="illus-row">
+          <div class="frame">
+            <div class="player-scene">
+              <div class="name-tag"><span class="dot sleeve-1"></span>Joueur 1</div>
+              <div class="hand-play">
+                <div class="card-slot" data-card="10D"></div>
+                <div data-hand="1"></div>
+              </div>
+            </div>
+          </div>
+          <span class="lt-sign">&lt;</span>
+          <div class="frame">
+            <div class="player-scene">
+              <div class="name-tag"><span class="dot sleeve-2"></span>Joueur 2</div>
+              <div class="hand-play">
+                <div class="card-slot" data-card="10S"></div>
+                <div data-hand="2"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="illus-caption">À rang égal, la couleur départage : le 10 de pique bat le 10 de carreau.</p>
+      </div>
+    </article>
+
+    <article class="rule-card">
+      <div class="rule-eyebrow">Règle</div>
+      <p class="rule-text">Si un joueur joue une carte simple, les autres devront suivre en mettant plus fort, ou passer.</p>
+
+      <div class="illustration">
+        <div class="illus-row">
+          <div class="frame">
+            <div class="player-scene">
+              <div class="name-tag"><span class="dot sleeve-1"></span>Joueur 1</div>
+              <div class="hand-play">
+                <div class="card-slot" data-card="3D"></div>
+                <div data-hand="1"></div>
+              </div>
+            </div>
+          </div>
+          <span class="lt-sign">&lt;</span>
+          <div class="frame">
+            <div class="player-scene">
+              <div class="name-tag"><span class="dot sleeve-2"></span>Joueur 2</div>
+              <div class="hand-play">
+                <div class="card-slot" data-card="5C"></div>
+                <div data-hand="2"></div>
+              </div>
+            </div>
+          </div>
+          <span class="lt-sign">&lt;</span>
+          <div class="frame">
+            <div class="player-scene">
+              <div class="name-tag"><span class="dot sleeve-3"></span>Joueur 3</div>
+              <div class="hand-play">
+                <div class="card-slot" data-card="5S"></div>
+                <div data-hand="3"></div>
+              </div>
+            </div>
+          </div>
+          <span class="lt-sign">&lt;</span>
+          <div class="frame">
+            <div class="player-scene">
+              <div class="name-tag"><span class="dot sleeve-4"></span>Joueur 4</div>
+              <div class="hand-play">
+                <div class="card-slot" data-card="10H"></div>
+                <div data-hand="4"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="illus-caption">3 de carreau → 5 de trèfle → 5 de pique (même rang, couleur plus forte) → 10 de cœur. Chacun doit suivre plus fort, ou passer.</p>
+      </div>
+    </article>
+
+    <article class="rule-card">
+      <div class="rule-eyebrow">Règle</div>
+      <p class="rule-text">Même chose pour les paires et les brelans.</p>
+
+      <div class="illustration">
+        <span class="row-label">Paires</span>
+        <div class="illus-row">
+          <div class="frame">
+            <div class="player-scene">
+              <div class="name-tag"><span class="dot sleeve-1"></span>Joueur 1</div>
+              <div class="hand-play">
+                <div class="card-group"><div class="card-slot" data-card="3D"></div><div class="card-slot" data-card="3C"></div></div>
+                <div data-hand="1"></div>
+              </div>
+            </div>
+          </div>
+          <div class="frame">
+            <div class="player-scene">
+              <div class="name-tag"><span class="dot sleeve-2"></span>Joueur 2</div>
+              <div class="hand-play">
+                <div class="card-group"><div class="card-slot" data-card="6D"></div><div class="card-slot" data-card="6C"></div></div>
+                <div data-hand="2"></div>
+              </div>
+            </div>
+          </div>
+          <div class="frame">
+            <div class="player-scene">
+              <div class="name-tag"><span class="dot sleeve-3"></span>Joueur 3</div>
+              <div class="hand-play">
+                <div class="card-group"><div class="card-slot" data-card="10D"></div><div class="card-slot" data-card="10C"></div></div>
+                <div data-hand="3"></div>
+              </div>
+            </div>
+          </div>
+          <div class="frame">
+            <div class="player-scene">
+              <div class="name-tag"><span class="dot sleeve-4"></span>Joueur 4</div>
+              <div class="hand-play">
+                <div class="card-group"><div class="card-slot" data-card="JD"></div><div class="card-slot" data-card="JC"></div></div>
+                <div data-hand="4"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <span class="row-label">Brelans</span>
+        <div class="illus-row">
+          <div class="frame">
+            <div class="player-scene">
+              <div class="name-tag"><span class="dot sleeve-1"></span>Joueur 1</div>
+              <div class="hand-play">
+                <div class="card-group"><div class="card-slot" data-card="3D"></div><div class="card-slot" data-card="3C"></div><div class="card-slot" data-card="3H"></div></div>
+                <div data-hand="1"></div>
+              </div>
+            </div>
+          </div>
+          <div class="frame">
+            <div class="player-scene">
+              <div class="name-tag"><span class="dot sleeve-2"></span>Joueur 2</div>
+              <div class="hand-play">
+                <div class="card-group"><div class="card-slot" data-card="6D"></div><div class="card-slot" data-card="6C"></div><div class="card-slot" data-card="6H"></div></div>
+                <div data-hand="2"></div>
+              </div>
+            </div>
+          </div>
+          <div class="frame">
+            <div class="player-scene">
+              <div class="name-tag"><span class="dot sleeve-3"></span>Joueur 3</div>
+              <div class="hand-play">
+                <div class="card-group"><div class="card-slot" data-card="10D"></div><div class="card-slot" data-card="10C"></div><div class="card-slot" data-card="10H"></div></div>
+                <div data-hand="3"></div>
+              </div>
+            </div>
+          </div>
+          <div class="frame">
+            <div class="player-scene">
+              <div class="name-tag"><span class="dot sleeve-4"></span>Joueur 4</div>
+              <div class="hand-play">
+                <div class="card-group"><div class="card-slot" data-card="JD"></div><div class="card-slot" data-card="JC"></div><div class="card-slot" data-card="JH"></div></div>
+                <div data-hand="4"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <article class="rule-card">
+      <div class="rule-eyebrow">Règle</div>
+      <p class="rule-text">Quand un jeu en 5 cartes est posé, vous n'êtes pas obligé de jouer le même : vous pouvez rejouer le même jeu en plus fort, ou un autre jeu en 5 cartes plus fort.</p>
+
+      <div class="illustration">
+        <div class="illus-row">
+          <div class="frame combo-frame">
+            <div class="card-group">
+              <div class="card-slot" data-card="5D"></div><div class="card-slot" data-card="6C"></div><div class="card-slot" data-card="7H"></div><div class="card-slot" data-card="8S"></div><div class="card-slot" data-card="9D"></div>
+            </div>
+            <span class="combo-label">Suite</span>
+          </div>
+          <span class="lt-sign">&lt;</span>
+          <div class="frame combo-frame">
+            <div class="card-group">
+              <div class="card-slot" data-card="3H"></div><div class="card-slot" data-card="7H"></div><div class="card-slot" data-card="9H"></div><div class="card-slot" data-card="JH"></div><div class="card-slot" data-card="KH"></div>
+            </div>
+            <span class="combo-label">Couleur</span>
+          </div>
+          <span class="lt-sign">&lt;</span>
+          <div class="frame combo-frame">
+            <div class="card-group">
+              <div class="card-slot" data-card="7D"></div><div class="card-slot" data-card="7C"></div><div class="card-slot" data-card="7H"></div><div class="card-slot" data-card="KS"></div><div class="card-slot" data-card="KD"></div>
+            </div>
+            <span class="combo-label">Full</span>
+          </div>
+          <span class="lt-sign">&lt;</span>
+          <div class="frame combo-frame">
+            <div class="card-group">
+              <div class="card-slot" data-card="9D"></div><div class="card-slot" data-card="9C"></div><div class="card-slot" data-card="9H"></div><div class="card-slot" data-card="9S"></div><div class="card-slot" data-card="4D"></div>
+            </div>
+            <span class="combo-label">Carré</span>
+          </div>
+          <span class="lt-sign">&lt;</span>
+          <div class="frame combo-frame">
+            <div class="card-group">
+              <div class="card-slot" data-card="4H"></div><div class="card-slot" data-card="5H"></div><div class="card-slot" data-card="6H"></div><div class="card-slot" data-card="7H"></div><div class="card-slot" data-card="8H"></div>
+            </div>
+            <span class="combo-label">Quinte flush</span>
+          </div>
+        </div>
+        <p class="illus-caption">Exemples parmi d'autres — seule la catégorie du jeu compte pour ce classement.</p>
+      </div>
+    </article>
+
+    <article class="rule-card">
+      <div class="rule-eyebrow">Règle</div>
+      <p class="rule-text">Quand un joueur a la main — qu'il ait commencé la manche en premier, ou qu'il ait fait passer tous les autres — il peut jouer la combinaison de son choix.</p>
+
+      <div class="illustration">
+        <div class="illus-row">
+          <div class="frame">
+            <div class="player-scene">
+              <div class="name-tag"><span class="dot sleeve-1"></span>Joueur 1</div>
+              <div class="hand-play">
+                <div class="card-slot" data-card="7D"></div>
+                <div data-hand="1"></div>
+              </div>
+            </div>
+          </div>
+          <span class="or-sign">ou</span>
+          <div class="frame">
+            <div class="player-scene">
+              <div class="name-tag"><span class="dot sleeve-1"></span>Joueur 1</div>
+              <div class="hand-play">
+                <div class="card-group"><div class="card-slot" data-card="9D"></div><div class="card-slot" data-card="9C"></div></div>
+                <div data-hand="1"></div>
+              </div>
+            </div>
+          </div>
+          <span class="or-sign">ou</span>
+          <div class="frame">
+            <div class="player-scene">
+              <div class="name-tag"><span class="dot sleeve-1"></span>Joueur 1</div>
+              <div class="hand-play">
+                <div class="card-group"><div class="card-slot" data-card="4D"></div><div class="card-slot" data-card="5C"></div><div class="card-slot" data-card="6H"></div><div class="card-slot" data-card="7S"></div><div class="card-slot" data-card="8D"></div></div>
+                <div data-hand="1"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="illus-caption">Carte simple, paire, brelan, suite… à la main, aucune obligation : le choix est libre.</p>
+      </div>
+    </article>
+
+    <article class="rule-card">
+      <div class="rule-eyebrow">Règle</div>
+      <p class="rule-text">La manche se termine quand un joueur a posé toutes ses cartes : les cartes restant dans la main des autres sont comptées et s'ajoutent à leur total cumulé. La partie se termine quand un perdant est désigné — par exemple avec une limite fixée à 50, si le Joueur 1 atteint 54 cartes cumulées après 7 manches, il perd. Les autres sont classés selon leur total : le gagnant est celui qui en a le moins.</p>
+
+      <div class="illustration">
+        <div class="frame scoreboard">
+          <div class="scoreboard-title">Cartes cumulées après 7 manches — limite : 50</div>
+          <div class="tally">
+            <span class="rank-badge">1ᵉʳ</span>
+            <span class="tally-name"><span class="dot sleeve-2"></span>Joueur 2</span>
+            <div class="tally-track"><div class="tally-fill sleeve-2" style="width:35%"></div><div class="tally-limit" style="left:83.3%"></div></div>
+            <span class="tally-value">21</span>
+
+            <span class="rank-badge">2ᵉ</span>
+            <span class="tally-name"><span class="dot sleeve-3"></span>Joueur 3</span>
+            <div class="tally-track"><div class="tally-fill sleeve-3" style="width:55%"></div><div class="tally-limit" style="left:83.3%"></div></div>
+            <span class="tally-value">33</span>
+
+            <span class="rank-badge">3ᵉ</span>
+            <span class="tally-name"><span class="dot sleeve-4"></span>Joueur 4</span>
+            <div class="tally-track"><div class="tally-fill sleeve-4" style="width:66.6%"></div><div class="tally-limit" style="left:83.3%"></div></div>
+            <span class="tally-value">40</span>
+
+            <span class="rank-badge lost">4ᵉ</span>
+            <span class="tally-name"><span class="dot sleeve-1"></span>Joueur 1</span>
+            <div class="tally-track"><div class="tally-fill over" style="width:90%"></div><div class="tally-limit" style="left:83.3%"></div></div>
+            <span class="tally-value">54</span>
+          </div>
+          <div class="scoreboard-legend"><span class="swatch"></span>Limite : 50 cartes cumulées</div>
+        </div>
+        <p class="illus-caption">Le Joueur 1 dépasse la limite avec 54 cartes cumulées : la partie s'arrête, il termine dernier. Les autres sont classés du moins de cartes (1ᵉʳ) au plus.</p>
+      </div>
+    </article>
+
+  </div>
+
+  <p class="footer-note">D'autres règles seront ajoutées ici, une par une.</p>
+</div>
+
+<script>
+(function(){
+  var SUIT_SYMBOL = { D:'♦', C:'♣', H:'♥', S:'♠' };
+  var SUIT_RED = { D:true, H:true, C:false, S:false };
+  var RANK_DISPLAY = { J:'V', Q:'D', K:'R' };
+  function rankDisplay(r){ return RANK_DISPLAY[r] || r; }
+
+  var PIP_LAYOUTS = {
+    '2':[{x:50,y:22,rot:0},{x:50,y:78,rot:180}],
+    '3':[{x:50,y:18,rot:0},{x:50,y:50,rot:0},{x:50,y:82,rot:180}],
+    '4':[{x:28,y:20,rot:0},{x:72,y:20,rot:0},{x:28,y:80,rot:180},{x:72,y:80,rot:180}],
+    '5':[{x:28,y:20,rot:0},{x:72,y:20,rot:0},{x:50,y:50,rot:0},{x:28,y:80,rot:180},{x:72,y:80,rot:180}],
+    '6':[{x:28,y:18,rot:0},{x:72,y:18,rot:0},{x:28,y:50,rot:0},{x:72,y:50,rot:0},{x:28,y:82,rot:180},{x:72,y:82,rot:180}],
+    '7':[{x:28,y:14,rot:0},{x:72,y:14,rot:0},{x:50,y:31,rot:0},{x:28,y:50,rot:0},{x:72,y:50,rot:0},{x:28,y:86,rot:180},{x:72,y:86,rot:180}],
+    '8':[{x:28,y:12,rot:0},{x:72,y:12,rot:0},{x:50,y:28,rot:0},{x:28,y:46,rot:0},{x:72,y:46,rot:0},{x:50,y:72,rot:180},{x:28,y:88,rot:180},{x:72,y:88,rot:180}],
+    '9':[{x:28,y:10,rot:0},{x:72,y:10,rot:0},{x:28,y:32,rot:0},{x:72,y:32,rot:0},{x:50,y:50,rot:0},{x:28,y:68,rot:180},{x:72,y:68,rot:180},{x:28,y:90,rot:180},{x:72,y:90,rot:180}],
+    '10':[{x:28,y:8,rot:0},{x:72,y:8,rot:0},{x:50,y:21,rot:0},{x:28,y:30,rot:0},{x:72,y:30,rot:0},{x:28,y:70,rot:180},{x:72,y:70,rot:180},{x:50,y:79,rot:180},{x:28,y:92,rot:180},{x:72,y:92,rot:180}]
+  };
+  var COURT_CROWN = {
+    J: '<path d="M30 26 L36 13 L42 22 L50 11 L58 22 L64 13 L70 26 Z" fill="var(--card-gold)" stroke="currentColor" stroke-width="1.2"/>'
+     + '<rect x="29" y="26" width="42" height="5" rx="1" fill="var(--card-gold)" stroke="currentColor" stroke-width="1.2"/>',
+    Q: '<path d="M27 27 Q34 10 43 23 Q50 6 57 23 Q66 10 73 27 Z" fill="var(--card-gold)" stroke="currentColor" stroke-width="1.2"/>'
+     + '<circle cx="34" cy="13" r="2.6" fill="var(--card-gold)" stroke="currentColor" stroke-width=".8"/>'
+     + '<circle cx="50" cy="8" r="2.8" fill="var(--card-gold)" stroke="currentColor" stroke-width=".8"/>'
+     + '<circle cx="66" cy="13" r="2.6" fill="var(--card-gold)" stroke="currentColor" stroke-width=".8"/>'
+     + '<rect x="27" y="27" width="46" height="5" rx="1" fill="var(--card-gold)" stroke="currentColor" stroke-width="1.2"/>',
+    K: '<path d="M27 27 L31 9 L41 19 L50 4 L59 19 L69 9 L73 27 Z" fill="var(--card-gold)" stroke="currentColor" stroke-width="1.2"/>'
+     + '<line x1="50" y1="4" x2="50" y2="-1" stroke="currentColor" stroke-width="1.8"/>'
+     + '<line x1="46.5" y1="1.5" x2="53.5" y2="1.5" stroke="currentColor" stroke-width="1.8"/>'
+     + '<rect x="27" y="27" width="46" height="5" rx="1" fill="var(--card-gold)" stroke="currentColor" stroke-width="1.2"/>'
+  };
+  function courtBustMarkup(card){
+    var crown = COURT_CROWN[card.r] || COURT_CROWN.J;
+    return crown
+      + '<circle cx="50" cy="43" r="13" fill="var(--card-face)" stroke="currentColor" stroke-width="2.2"/>'
+      + '<path d="M24 80 Q50 53 76 80 L80 94 Q50 107 20 94 Z" fill="currentColor" opacity=".85"/>'
+      + '<path d="M37 80 L50 71 L63 80 L59 94 L41 94 Z" fill="var(--card-face)" opacity=".92"/>';
+  }
+  function cardFaceHtml(card){
+    var sym = SUIT_SYMBOL[card.s];
+    if(card.r==='A'){
+      return '<div class="card-center"><span class="pip pip-ace">'+sym+'</span></div>';
+    }
+    if(card.r==='J' || card.r==='Q' || card.r==='K'){
+      var bust = courtBustMarkup(card);
+      return '<div class="card-center">'
+        + '<svg class="face-court" viewBox="0 -2 100 144" aria-hidden="true" style="width:100%;height:100%;">'
+        + '<g>'+bust+'</g>'
+        + '<text x="50" y="73" text-anchor="middle" font-size="17" font-family="\'Space Mono\',monospace" font-weight="700" fill="currentColor" opacity=".45">'+sym+'</text>'
+        + '<g transform="rotate(180 50 70)">'+bust+'</g>'
+        + '</svg></div>';
+    }
+    var layout = PIP_LAYOUTS[card.r] || [];
+    var pips = layout.map(function(p){
+      return '<span class="pip" style="left:'+p.x+'%;top:'+p.y+'%;transform:translate(-50%,-50%) rotate('+p.rot+'deg);">'+sym+'</span>';
+    }).join('');
+    return '<div class="card-center">'+pips+'</div>';
+  }
+  function cardEl(card){
+    var cls = ['card', SUIT_RED[card.s] ? 'red':'black'];
+    var rd = rankDisplay(card.r);
+    var corner = '<span class="rank">'+rd+'</span><span class="suit">'+SUIT_SYMBOL[card.s]+'</span>';
+    return '<div class="'+cls.join(' ')+'">'
+      + '<span class="corner tl">'+corner+'</span>'
+      + cardFaceHtml(card)
+      + '<span class="corner br">'+corner+'</span>'
+      + '</div>';
+  }
+  function parseCard(code){
+    return { r: code.slice(0,-1), s: code.slice(-1) };
+  }
+
+  // Une main vue de dos, doigts vers le haut, qui vient de poser la carte au-dessus.
+  // Le pull (manche) n'apparaît que par un tout petit bout de manchette, au poignet.
+  function handIcon(sleeveIdx){
+    return '<svg class="hand-icon" viewBox="0 0 100 84" aria-hidden="true">'
+      + '<rect class="cuff sleeve-'+sleeveIdx+'" x="22" y="58" width="56" height="24" rx="7"/>'
+      + '<rect class="skin" x="12" y="34" width="76" height="34" rx="16"/>'
+      + '<rect class="skin" x="20" y="6" width="13" height="30" rx="6"/>'
+      + '<rect class="skin" x="36" y="0" width="13" height="36" rx="6"/>'
+      + '<rect class="skin" x="52" y="4" width="13" height="32" rx="6"/>'
+      + '<rect class="skin" x="68" y="10" width="12" height="26" rx="6"/>'
+      + '<rect class="skin" x="0" y="46" width="26" height="14" rx="7" transform="rotate(-20 13 53)"/>'
+      + '</svg>';
+  }
+
+  document.querySelectorAll('[data-card]').forEach(function(el){
+    el.innerHTML = cardEl(parseCard(el.getAttribute('data-card')));
+  });
+  document.querySelectorAll('[data-hand]').forEach(function(el){
+    el.innerHTML = handIcon(el.getAttribute('data-hand'));
+  });
+})();
+</script>
+
+</body>
+</html>
