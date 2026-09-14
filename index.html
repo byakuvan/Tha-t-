@@ -870,6 +870,7 @@
 <div id="app"></div>
 <div class="toast" id="toast"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.js"></script>
 <script>
 (function(){
 "use strict";
@@ -1126,8 +1127,19 @@ function syncHandOrder(hand){
 }
 function resetHandOrder(){ S.handOrder = null; render(); }
 
-let dbNs = null;
-let roomRef = null;
+/* ============================ Config Supabase ============================
+   Renseigne ces deux valeurs avec celles de ton propre projet Supabase :
+   Dashboard → Project Settings → API → "Project URL" et clé "anon public".
+   La clé "anon" est faite pour être visible côté client (comme ici) — ce
+   n'est pas un secret serveur. Voir le README du dépôt pour ce que ça
+   implique en termes de sécurité (accès en lecture/écriture) avant de
+   mettre ce jeu en ligne publiquement. */
+const SUPABASE_URL = 'https://TON-PROJET.supabase.co';
+const SUPABASE_ANON_KEY = 'TA_CLE_ANON_PUBLIC';
+
+let supa = null;          // client Supabase (remplace dbNs)
+let roomChannel = null;   // abonnement réaltime au salon en cours (remplace unsub)
+let roomRef = null;       // { code } — juste une référence légère, pas un objet Firestore
 let unsub = null;
 
 /* hot-reload: keep local UI state (not the authoritative game state) across a republish */
@@ -1153,80 +1165,159 @@ function bootApp(restored){
 
 async function initDb(){
   try{
-    dbNs = await claude.use('db');
-  } catch(e){ dbNs = null; }
-  S.dbReady = !!dbNs;
-  if(dbNs && identity.name) subscribeAccount();
+    if(!window.supabase || !window.supabase.createClient) throw new Error('supabase-js non chargé');
+    if(SUPABASE_URL.includes('TON-PROJET') || SUPABASE_ANON_KEY==='TA_CLE_ANON_PUBLIC'){
+      throw new Error('Configure SUPABASE_URL et SUPABASE_ANON_KEY en haut du fichier.');
+    }
+    supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  } catch(e){ console.error(e); supa = null; }
+  S.dbReady = !!supa;
+  if(supa && identity.name) subscribeAccount();
   render();
+}
+
+/* ---- conversions ligne SQL (snake_case, colonnes normalisées) <-> objet JS
+   (camelCase, forme imbriquée) tel que le reste du code du jeu l'attend.
+   Isoler ces deux fonctions permet de garder TOUTE la logique de jeu
+   (dealRound, endRound, startGame, rendu...) inchangée. */
+function roomRowToObj(row){
+  return {
+    createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
+    hostId: row.host_id,
+    status: row.status,
+    settings: {
+      scoreLimit: row.score_limit,
+      mode: row.mode,
+      mise: Number(row.mise)||0,
+      noFinishOnTwo: !!row.no_finish_on_two,
+      grandeCatastrophe: !!row.grande_catastrophe,
+    },
+    seats: row.seats || [null,null,null,null],
+    scores: row.scores || {},
+    round: row.round || null,
+    lastRoundResult: row.last_round_result || null,
+    finalRanking: row.final_ranking || null,
+    _version: row.version,   // usage interne à mutate() — jamais lu par la logique de jeu
+  };
+}
+function roomObjToRow(obj){
+  return {
+    host_id: obj.hostId,
+    status: obj.status,
+    score_limit: obj.settings.scoreLimit,
+    mode: obj.settings.mode,
+    mise: obj.settings.mise,
+    no_finish_on_two: !!obj.settings.noFinishOnTwo,
+    grande_catastrophe: !!obj.settings.grandeCatastrophe,
+    seats: obj.seats,
+    scores: obj.scores,
+    round: obj.round,
+    last_round_result: obj.lastRoundResult,
+    final_ranking: obj.finalRanking,
+  };
+}
+function accountRowToObj(row){
+  return {
+    username: row.username,
+    passwordHash: row.password_hash,
+    salt: row.salt,
+    credits: Number(row.credits)||0,
+    gamesPlayed: row.games_played||0,
+    wins: row.wins||0,
+    createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
+    _version: row.version,
+  };
+}
+function accountObjToRow(obj){
+  return {
+    username: obj.username,
+    password_hash: obj.passwordHash,
+    salt: obj.salt,
+    credits: obj.credits,
+    games_played: obj.gamesPlayed,
+    wins: obj.wins,
+  };
 }
 
 /* ============================ Comptes (identifiant/mot de passe) ============================ */
 let accountUnsub = null;
-function subscribeAccount(){
-  if(!dbNs || !identity.name) return;
+async function subscribeAccount(){
+  if(!supa || !identity.name) return;
   if(accountUnsub){ accountUnsub(); accountUnsub=null; }
-  const ref = dbNs.collection('accounts').doc(accountKey(identity.name));
-  accountUnsub = ref.onSnapshot(snap=>{
-    S.myAccount = snap.exists ? snap.data() : null;
-    render();
-  }, err=>{ console.error(err); });
+  const key = accountKey(identity.name);
+
+  // état initial (postgres_changes ne renvoie que les CHANGEMENTS, pas l'état courant)
+  const { data: row } = await supa.from('accounts').select('*').eq('account_key', key).maybeSingle();
+  S.myAccount = row ? accountRowToObj(row) : null;
+  render();
+
+  const channel = supa.channel('account:'+key)
+    .on('postgres_changes', { event:'*', schema:'public', table:'accounts', filter:`account_key=eq.${key}` }, payload=>{
+      S.myAccount = payload.eventType==='DELETE' ? null : accountRowToObj(payload.new);
+      render();
+    })
+    .subscribe();
+  accountUnsub = () => supa.removeChannel(channel);
 }
 
 async function registerAccount(usernameRaw, password){
   const key = accountKey(usernameRaw);
   if(key.length<3) return {ok:false, error:'Identifiant invalide (3 caractères minimum : lettres, chiffres, - ou _).'};
   if(!password || password.length<4) return {ok:false, error:'Mot de passe trop court (4 caractères minimum).'};
-  if(!dbNs) return {ok:false, error:'Connexion indisponible pour le moment.'};
-  const ref = dbNs.collection('accounts').doc(key);
-  let lease;
-  try{ lease = await ref.acquire({ holder: identity.playerId, ttlMs: 3000 }); }
-  catch(e){ return {ok:false, error:'Connexion instable, réessaie.'}; }
-  if(!lease.acquired) return {ok:false, error:'Réessaie dans un instant…'};
+  if(!supa) return {ok:false, error:'Connexion indisponible pour le moment.'};
   try{
-    const snap = await ref.get();
-    if(snap.exists && snap.data() && snap.data().passwordHash){
-      return {ok:false, error:'Ce nom est déjà pris.'};
-    }
     const {hash, salt} = await hashPassword(password);
-    const account = {
-      username: usernameRaw.trim(), passwordHash: hash, salt,
-      credits: 100, wins:0, gamesPlayed:0, createdAt: Date.now(),
-    };
-    await ref.set(account);
-    return {ok:true, username: account.username};
+    const username = usernameRaw.trim();
+    // account_key est clé primaire : une insertion en doublon échoue proprement (code 23505)
+    // au lieu d'avoir besoin d'un verrou explicite comme avec l'ancienne base.
+    const { error } = await supa.from('accounts').insert({
+      account_key: key, username, password_hash: hash, salt,
+      credits: 100, wins: 0, games_played: 0,
+    });
+    if(error){
+      if(error.code==='23505') return {ok:false, error:'Ce nom est déjà pris.'};
+      console.error(error);
+      return {ok:false, error:'Une erreur est survenue.'};
+    }
+    return {ok:true, username};
   } catch(e){ console.error(e); return {ok:false, error:'Une erreur est survenue.'}; }
 }
 
 async function loginAccount(usernameRaw, password){
   const key = accountKey(usernameRaw);
-  if(!dbNs) return {ok:false, error:'Connexion indisponible pour le moment.'};
+  if(!supa) return {ok:false, error:'Connexion indisponible pour le moment.'};
   try{
-    const ref = dbNs.collection('accounts').doc(key);
-    const snap = await ref.get();
-    if(!snap.exists) return {ok:false, error:'Identifiant ou mot de passe incorrect.'};
-    const data = snap.data();
-    const ok = await verifyPassword(password, data.salt, data.passwordHash);
+    const { data: row, error } = await supa.from('accounts').select('username,password_hash,salt').eq('account_key', key).maybeSingle();
+    if(error){ console.error(error); return {ok:false, error:'Une erreur est survenue.'}; }
+    if(!row) return {ok:false, error:'Identifiant ou mot de passe incorrect.'};
+    const ok = await verifyPassword(password, row.salt, row.password_hash);
     if(!ok) return {ok:false, error:'Identifiant ou mot de passe incorrect.'};
-    return {ok:true, username: data.username || usernameRaw.trim()};
+    return {ok:true, username: row.username || usernameRaw.trim()};
   } catch(e){ console.error(e); return {ok:false, error:'Une erreur est survenue.'}; }
 }
 
+// Lecture-modification-écriture avec contrôle de concurrence optimiste (colonne "version"),
+// qui remplace le verrou acquire()/lease de l'ancienne base : on ne réécrit que si personne
+// d'autre n'a modifié la ligne entre-temps (WHERE version = ...), et on réessaie sinon.
 async function mutateAccount(username, fn){
-  if(!dbNs) return false;
-  const ref = dbNs.collection('accounts').doc(accountKey(username));
-  let lease;
-  try{ lease = await ref.acquire({ holder: identity.playerId, ttlMs: 1500 }); }
-  catch(e){ return false; }
-  if(!lease.acquired) return false;
-  try{
-    const snap = await ref.get();
-    if(!snap.exists) return false;
-    const data = JSON.parse(JSON.stringify(snap.data()));
-    const next = fn(data);
-    if(!next) return false;
-    await ref.set(next);
-    return true;
-  } catch(e){ console.error(e); return false; }
+  if(!supa) return false;
+  const key = accountKey(username);
+  for(let attempt=0; attempt<5; attempt++){
+    try{
+      const { data: row, error } = await supa.from('accounts').select('*').eq('account_key', key).maybeSingle();
+      if(error || !row) return false;
+      const next = fn(accountRowToObj(row));
+      if(!next) return false;
+      const { data: updated, error: updErr } = await supa.from('accounts')
+        .update({ ...accountObjToRow(next), version: row.version+1 })
+        .eq('account_key', key).eq('version', row.version)
+        .select();
+      if(updErr){ console.error(updErr); return false; }
+      if(updated && updated.length) return true;
+      // sinon : quelqu'un d'autre a écrit entre-temps (version différente) — on réessaie
+    } catch(e){ console.error(e); return false; }
+  }
+  return false;
 }
 
 function onAuthSuccess(username){
@@ -1250,10 +1341,11 @@ function logout(){
 
 async function openLeaderboard(){
   S.screen='leaderboard'; S.leaderboardLoading=true; S.leaderboard=[]; render();
-  if(!dbNs){ S.leaderboardLoading=false; render(); return; }
+  if(!supa){ S.leaderboardLoading=false; render(); return; }
   try{
-    const snap = await dbNs.collection('accounts').orderBy('credits','desc').limit(50).get();
-    S.leaderboard = snap.docs.map(d=>{ const v=d.data()||{}; return { username: v.username || d.id, credits: v.credits||0 }; });
+    const { data, error } = await supa.from('accounts').select('username,credits').order('credits',{ascending:false}).limit(50);
+    if(error) throw error;
+    S.leaderboard = (data||[]).map(v=>({ username: v.username, credits: Number(v.credits)||0 }));
   } catch(e){ console.error(e); toast('Impossible de charger le classement.'); }
   S.leaderboardLoading=false;
   render();
@@ -1297,26 +1389,38 @@ async function applyPayout({finalRanking, seats, settings}){
   }
 }
 
-/* ============================ Room mutation helper ============================ */
+/* ============================ Room mutation helper ============================
+   Même principe que mutateAccount() : lecture de la ligne, application de fn()
+   sur l'objet "forme jeu" habituel, puis écriture conditionnée à la version lue
+   (WHERE version = ...). fn() ne voit jamais les colonnes SQL, seulement la
+   même forme imbriquée (data.settings.*, data.seats, data.round...) qu'avant —
+   toute la logique de jeu appelante (startGame, dealRound, endRound, etc.)
+   reste donc inchangée. */
 async function mutate(fn){
-  if(!dbNs || !roomRef){ toast('Multijoueur indisponible pour le moment.'); return false; }
-  let lease;
-  try { lease = await roomRef.acquire({ holder: identity.playerId, ttlMs: 1000 }); }
-  catch(e){ toast('Connexion instable, réessaie.'); return false; }
-  if(!lease.acquired){ toast('Réessaie dans un instant…'); return false; }
-  try{
-    const snap = await roomRef.get();
-    if(!snap.exists) { toast("Cette partie n'existe plus."); return false; }
-    const data = JSON.parse(JSON.stringify(snap.data()));
-    const next = fn(data);
-    if(!next) return false;
-    await roomRef.set(next);
-    return true;
-  } catch(e){
-    console.error(e);
-    toast('Une erreur est survenue, réessaie.');
-    return false;
+  if(!supa || !roomRef){ toast('Multijoueur indisponible pour le moment.'); return false; }
+  for(let attempt=0; attempt<5; attempt++){
+    try{
+      const { data: row, error } = await supa.from('rooms').select('*').eq('code', roomRef.code).maybeSingle();
+      if(error){ console.error(error); toast('Une erreur est survenue, réessaie.'); return false; }
+      if(!row) { toast("Cette partie n'existe plus."); return false; }
+      const data = roomRowToObj(row);
+      const next = fn(data);
+      if(!next) return false;
+      const { data: updated, error: updErr } = await supa.from('rooms')
+        .update({ ...roomObjToRow(next), version: row.version+1 })
+        .eq('code', roomRef.code).eq('version', row.version)
+        .select();
+      if(updErr){ console.error(updErr); toast('Une erreur est survenue, réessaie.'); return false; }
+      if(updated && updated.length) return true;
+      // conflit de version (quelqu'un d'autre vient d'écrire) — on relit et on réessaie
+    } catch(e){
+      console.error(e);
+      toast('Une erreur est survenue, réessaie.');
+      return false;
+    }
   }
+  toast('Réessaie dans un instant…');
+  return false;
 }
 
 function freshScores(numSeats){
@@ -1340,32 +1444,45 @@ function freshRoom(code){
   };
 }
 
-function subscribeRoom(code){
+function applyRoomSnapshot(data){
+  if(!data){
+    S.room = null;
+    toast('La partie a été fermée.');
+    leaveToLobbyChoice();
+    return;
+  }
+  S.room = data;
+  const seatIdx = S.room.seats.findIndex(s=>s && s.playerId===identity.playerId);
+  S.mySeat = seatIdx>=0 ? seatIdx : null;
+  if(S.mySeat==null){
+    // on n'est plus dans la partie (siège repris ailleurs) — retour au menu
+    toast("Tu n'es plus dans cette partie.");
+    leaveToLobbyChoice();
+    return;
+  }
+  S.selected = S.selected.filter(id => (S.room.round && S.room.round.hands[S.mySeat]||[]).some(c=>cardId(c)===id));
+  render();
+}
+
+async function subscribeRoom(code){
   if(unsub){ unsub(); unsub=null; }
-  roomRef = dbNs.doc('rooms/'+code);
+  roomRef = { code };
   S.roomCode = code;
-  unsub = roomRef.onSnapshot(snap=>{
-    if(!snap.exists){
-      S.room = null;
-      toast('La partie a été fermée.');
-      leaveToLobbyChoice();
-      return;
-    }
-    S.room = snap.data();
-    const seatIdx = S.room.seats.findIndex(s=>s && s.playerId===identity.playerId);
-    S.mySeat = seatIdx>=0 ? seatIdx : null;
-    if(S.mySeat==null){
-      // on n'est plus dans la partie (siège repris ailleurs) — retour au menu
-      toast("Tu n'es plus dans cette partie.");
-      leaveToLobbyChoice();
-      return;
-    }
-    S.selected = S.selected.filter(id => (S.room.round && S.room.round.hands[S.mySeat]||[]).some(c=>cardId(c)===id));
-    render();
-  }, err=>{
-    console.error(err);
-    toast('Connexion à la partie perdue.');
-  });
+
+  // état initial (postgres_changes ne renvoie que les CHANGEMENTS, pas l'état courant)
+  const { data: row, error } = await supa.from('rooms').select('*').eq('code', code).maybeSingle();
+  if(error){ console.error(error); toast('Connexion à la partie perdue.'); return; }
+  applyRoomSnapshot(row ? roomRowToObj(row) : null);
+  if(!row) return;
+
+  const channel = supa.channel('room:'+code)
+    .on('postgres_changes', { event:'*', schema:'public', table:'rooms', filter:`code=eq.${code}` }, payload=>{
+      applyRoomSnapshot(payload.eventType==='DELETE' ? null : roomRowToObj(payload.new));
+    })
+    .subscribe(status=>{
+      if(status==='CHANNEL_ERROR' || status==='TIMED_OUT') toast('Connexion à la partie perdue.');
+    });
+  unsub = () => supa.removeChannel(channel);
 }
 
 function leaveToLobbyChoice(){
@@ -1377,12 +1494,12 @@ function leaveToLobbyChoice(){
 }
 
 async function reconnect(){
-  if(!dbNs){ return; } // retried once dbReady flips true, via render loop below
-  const ref = dbNs.doc('rooms/'+session.roomCode);
+  if(!supa){ return; } // retried once dbReady flips true, via render loop below
   try{
-    const snap = await ref.get();
-    if(!snap.exists){ lsDel('taite_session'); session=null; S.screen='lobbyChoice'; render(); return; }
-    const data = snap.data();
+    const { data: row, error } = await supa.from('rooms').select('*').eq('code', session.roomCode).maybeSingle();
+    if(error) throw error;
+    if(!row){ lsDel('taite_session'); session=null; S.screen='lobbyChoice'; render(); return; }
+    const data = roomRowToObj(row);
     const seat = data.seats[session.seat];
     if(!seat || seat.playerId!==identity.playerId){ lsDel('taite_session'); session=null; S.screen='lobbyChoice'; render(); return; }
     subscribeRoom(session.roomCode);
@@ -1399,7 +1516,7 @@ const dbReadyWatcher = setInterval(()=>{
 
 /* ================================ Actions ================================ */
 async function createRoom(){
-  if(!dbNs){ toast('Multijoueur indisponible pour le moment.'); return; }
+  if(!supa){ toast('Multijoueur indisponible pour le moment.'); return; }
   if(S.joining) return;
   const mode = S.createMode==='pari' ? 'pari' : 'normal';
   let mise = 0;
@@ -1413,19 +1530,16 @@ async function createRoom(){
   let code, ok=false;
   for(let i=0;i<6 && !ok;i++){
     code = randomCode(4);
-    try{
-      const ref = dbNs.doc('rooms/'+code);
-      const snap = await ref.get();
-      if(!snap.exists){
-        const room = freshRoom(code);
-        room.settings.mode = mode;
-        room.settings.mise = mise;
-        for(const m of MODIFIERS) room.settings[m.key] = !!S.createMods[m.key];
-        room.seats[0] = { playerId: identity.playerId, name: identity.name, connected:true };
-        await ref.set(room);
-        ok=true;
-      }
-    } catch(e){ console.error(e); }
+    const room = freshRoom(code);
+    room.settings.mode = mode;
+    room.settings.mise = mise;
+    for(const m of MODIFIERS) room.settings[m.key] = !!S.createMods[m.key];
+    room.seats[0] = { playerId: identity.playerId, name: identity.name, connected:true };
+    // code est clé primaire : une collision (code déjà pris) échoue proprement (23505),
+    // on retire simplement un autre code au tour suivant plutôt que de vérifier avant.
+    const { error } = await supa.from('rooms').insert({ code, ...roomObjToRow(room) });
+    if(!error){ ok=true; }
+    else if(error.code!=='23505'){ console.error(error); break; }
   }
   S.joining=false;
   if(!ok){ toast('Impossible de créer la partie, réessaie.'); render(); return; }
@@ -1438,43 +1552,49 @@ async function createRoom(){
 
 // Rejoint réellement la salle (prend un siège si besoin) — appelé directement pour une
 // partie normale, ou seulement après acceptation de la mise pour une partie pari.
+// Contrôle de concurrence optimiste (comme mutate()) : si deux joueurs cliquent en même
+// temps, un seul gagne la course sur la version, l'autre relit et retente.
 async function claimSeat(code){
-  const ref = dbNs.doc('rooms/'+code);
-  let lease;
-  try{ lease = await ref.acquire({holder: identity.playerId, ttlMs:1500}); }
-  catch(e){ toast('Connexion instable, réessaie.'); return; }
-  if(!lease.acquired){ toast('Réessaie dans un instant.'); return; }
-  try{
-    const snap = await ref.get();
-    if(!snap.exists){ toast('Code introuvable.'); return; }
-    const data = JSON.parse(JSON.stringify(snap.data())); // snap.data() is frozen — clone before mutating
-    const already = data.seats.findIndex(s=>s && s.playerId===identity.playerId);
-    let seatIdx = already;
-    if(seatIdx<0){
-      seatIdx = data.seats.findIndex(s=>!s);
-      if(seatIdx<0){ toast('Cette partie est complète.'); return; }
-      data.seats[seatIdx] = { playerId: identity.playerId, name: identity.name, connected:true };
-      await ref.set(data);
-    }
-    lsSet('taite_session', { roomCode: code, seat: seatIdx });
-    session = { roomCode: code, seat: seatIdx };
-    roomRef = ref;
-    subscribeRoom(code);
-    S.screen='room';
-  } catch(e){ console.error(e); toast('Une erreur est survenue.'); }
+  for(let attempt=0; attempt<5; attempt++){
+    try{
+      const { data: row, error } = await supa.from('rooms').select('*').eq('code', code).maybeSingle();
+      if(error){ console.error(error); toast('Une erreur est survenue.'); return; }
+      if(!row){ toast('Code introuvable.'); return; }
+      const data = roomRowToObj(row);
+      const already = data.seats.findIndex(s=>s && s.playerId===identity.playerId);
+      let seatIdx = already;
+      if(seatIdx<0){
+        seatIdx = data.seats.findIndex(s=>!s);
+        if(seatIdx<0){ toast('Cette partie est complète.'); return; }
+        data.seats[seatIdx] = { playerId: identity.playerId, name: identity.name, connected:true };
+        const { data: updated, error: updErr } = await supa.from('rooms')
+          .update({ seats: data.seats, version: row.version+1 })
+          .eq('code', code).eq('version', row.version)
+          .select();
+        if(updErr){ console.error(updErr); toast('Une erreur est survenue.'); return; }
+        if(!updated || !updated.length) continue; // conflit de version — on relit et retente
+      }
+      lsSet('taite_session', { roomCode: code, seat: seatIdx });
+      session = { roomCode: code, seat: seatIdx };
+      subscribeRoom(code);
+      S.screen='room';
+      return;
+    } catch(e){ console.error(e); toast('Une erreur est survenue.'); return; }
+  }
+  toast('Réessaie dans un instant…');
 }
 
 async function joinRoom(rawCode){
   const code = (rawCode||'').trim().toUpperCase();
   if(!code){ toast('Entre un code de partie.'); return; }
-  if(!dbNs){ toast('Multijoueur indisponible pour le moment.'); return; }
+  if(!supa){ toast('Multijoueur indisponible pour le moment.'); return; }
   if(S.joining) return;
   S.joining=true; render();
   try{
-    const ref = dbNs.doc('rooms/'+code);
-    const snap = await ref.get();
-    if(!snap.exists){ toast('Code introuvable.'); S.joining=false; render(); return; }
-    const data = snap.data();
+    const { data: row, error } = await supa.from('rooms').select('*').eq('code', code).maybeSingle();
+    if(error) throw error;
+    if(!row){ toast('Code introuvable.'); S.joining=false; render(); return; }
+    const data = roomRowToObj(row);
     const alreadySeated = data.seats.some(s=>s && s.playerId===identity.playerId);
     const mode = (data.settings && data.settings.mode) || 'normal';
     if(!alreadySeated && mode==='pari'){

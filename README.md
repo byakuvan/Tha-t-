@@ -4,35 +4,48 @@ Un jeu de cartes multijoueur (2 à 4 joueurs) inspiré du Tiến lên / Big Two,
 
 ## Contenu du dépôt
 
-- `index.html` — le jeu complet (interface, logique de jeu, écrans de connexion/lobby/partie). Fichier unique, autonome (HTML + CSS + JS), sans dépendance à builder.
+- `index.html` — le jeu complet (interface, logique de jeu, écrans de connexion/lobby/partie). Fichier unique, autonome (HTML + CSS + JS), branché sur **Supabase** pour les comptes et les salons multijoueur.
 - `regles.html` — les règles du jeu, illustrées.
+- `db/schema.sql` — le schéma PostgreSQL à appliquer sur ton projet Supabase (tables `accounts` et `rooms`, réplication temps réel, notes de sécurité).
 
-## ⚠️ Important : le multijoueur ne fonctionne pas tel quel en dehors de Claude
+## Mise en route (Supabase)
 
-Ce jeu a été développé et hébergé au départ comme un **Artifact Claude**, une page web qui tourne dans l'environnement de claude.ai. Pour la partie multijoueur (comptes, salons de jeu, synchronisation des cartes en temps réel), le code s'appuie sur une fonctionnalité propre à cet environnement : `window.claude.use('db')`, une petite base de données partagée fournie par la plateforme Claude.
+Le jeu tournait au départ comme un Artifact Claude, avec une petite base fournie par la plateforme (`window.claude.use('db')`). Cette version-ci a été réécrite pour utiliser **Supabase** à la place — un vrai backend, utilisable en dehors de Claude, avec une offre gratuite. Trois étapes pour la faire tourner :
 
-**Cette fonctionnalité n'existe pas en dehors de claude.ai.** Concrètement, si tu ouvres `index.html` tel quel (en local ou hébergé sur GitHub Pages, Netlify, etc.) :
+### 1. Crée un projet Supabase
 
-- L'interface s'affiche normalement (écran de connexion, règles, etc.).
-- Mais dès qu'on essaie de créer un compte, créer une partie ou en rejoindre une, le jeu affichera un message du type *« Le mode multijoueur n'est pas disponible »* — c'est normal, il n'y a tout simplement plus de base de données derrière.
+Sur [supabase.com](https://supabase.com), crée un compte et un nouveau projet (gratuit). Note son mot de passe de base de données quelque part, tu n'en auras normalement plus besoin après cette étape.
 
-### Pour rendre le multijoueur fonctionnel ailleurs
+### 2. Applique le schéma
 
-Il faut remplacer les appels à `dbNs` (recherche `claude.use('db')` et `dbNs.` dans `index.html`) par un vrai backend externe. Les opérations utilisées sont volontairement simples (lecture/écriture de documents JSON, un verrou court style "lease" pour éviter que deux joueurs écrivent en même temps, et un abonnement pour recevoir les mises à jour en direct) — elles se transposent assez naturellement vers, par exemple :
+Dans le dashboard du projet → **SQL Editor** → colle le contenu de `db/schema.sql` → **Run**.
 
-- **Firebase Firestore** (le plus proche conceptuellement de l'API actuelle : documents, `onSnapshot`, etc.)
-- **Supabase** (Postgres + réaltime + auth intégrée)
-- un petit serveur maison avec **WebSocket** (Node.js + `ws`, ou Socket.IO)
+Ça crée les tables `accounts` et `rooms`, et active la réplication temps réel dessus (`ALTER PUBLICATION supabase_realtime ADD TABLE ...`) — sans cette dernière ligne, le jeu fonctionnerait mais personne ne recevrait jamais la moindre mise à jour en direct (il faudrait recharger la page pour voir un adversaire jouer une carte).
 
-Les endroits à adapter dans le code sont regroupés :
-- `dbNs = await claude.use('db')` (initialisation) — à remplacer par l'initialisation du SDK du backend choisi.
-- Les fonctions `createRoom`, `claimSeat`, `joinRoom`, `subscribeRoom`, `mutate`, `mutateAccount`, `hashPassword`/`login`/`register` — toutes les opérations de lecture/écriture sur `rooms/<code>` et `accounts/<clé>`.
+### 3. Renseigne les clés dans `index.html`
 
-Le système de comptes (identifiant + mot de passe, hashé en SHA-256 avec sel, stocké dans la base) n'a lui-même rien de spécifique à Claude — il se transpose tel quel une fois branché sur un vrai stockage.
+Dans le dashboard → **Project Settings → API**, récupère :
+- l'**URL du projet** (ex : `https://abcdefgh.supabase.co`)
+- la clé **`anon` `public`**
 
-## Lancer le jeu en local (interface seule, sans multijoueur)
+Puis ouvre `index.html`, cherche ce bloc tout en haut du script (recherche `SUPABASE_URL`) et remplace les deux valeurs :
 
-Aucune installation nécessaire : ouvre simplement `index.html` dans un navigateur, ou sers le dossier avec un petit serveur statique, par exemple :
+```js
+const SUPABASE_URL = 'https://TON-PROJET.supabase.co';
+const SUPABASE_ANON_KEY = 'TA_CLE_ANON_PUBLIC';
+```
+
+C'est tout — le jeu est fonctionnel, en local ou une fois hébergé (voir plus bas).
+
+## ⚠️ Sécurité : à savoir avant de partager le lien largement
+
+La clé `anon` est faite pour être visible dans le code d'une page (ce n'est pas un secret serveur), mais par défaut, ces deux tables n'ont **aucune restriction d'accès (RLS)** : n'importe qui connaissant l'URL du projet et la clé `anon` — donc n'importe qui ouvrant simplement le jeu — peut en théorie lire ou modifier n'importe quelle ligne des deux tables directement (sans passer par l'interface du jeu), y compris les mots de passe hashés de tous les comptes ou les crédits de n'importe qui.
+
+C'est le même niveau de confiance qu'avait l'ancienne base Claude (pensée pour jouer entre amis, pas comme un vrai service avec de vrais enjeux). Le fichier `db/schema.sql` contient, en commentaire à la fin, des pistes concrètes pour muscler ça (restreindre les colonnes lisibles, vérifier les mots de passe côté serveur via une fonction SQL) si tu veux aller plus loin — demande si tu veux qu'on les mette en place.
+
+## Lancer le jeu en local
+
+Aucune installation nécessaire : ouvre simplement `index.html` dans un navigateur une fois les clés Supabase renseignées, ou sers le dossier avec un petit serveur statique :
 
 ```bash
 python3 -m http.server 8000
@@ -42,6 +55,6 @@ puis va sur `http://localhost:8000/index.html`.
 
 ## Héberger sur GitHub Pages
 
-1. Pousse ce dépôt sur GitHub.
+1. Pousse ce dépôt sur GitHub (avec tes clés Supabase déjà renseignées dans `index.html` — voir la note de sécurité ci-dessus : ces clés seront visibles publiquement dans le code source si le dépôt est public, ce qui est normal et attendu pour une clé `anon`).
 2. Dans les paramètres du dépôt, active *GitHub Pages* sur la branche principale (dossier racine).
-3. Le jeu sera accessible à l'URL fournie par GitHub — mais avec les mêmes limites décrites ci-dessus tant qu'un vrai backend n'est pas branché.
+3. Le jeu sera accessible à l'URL fournie par GitHub, jouable par n'importe qui, sans compte Claude.
